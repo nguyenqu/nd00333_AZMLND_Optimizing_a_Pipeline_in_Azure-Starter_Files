@@ -5,6 +5,9 @@ This project is part of the Udacity Azure ML Nanodegree.
 In this project, we build and optimize an Azure ML pipeline using the Python SDK and a provided Scikit-learn model.
 This model is then compared to an Azure AutoML run.
 
+**Hyperdrive** is a python package that automates the process of choosing the best hyperparameters for your machine learning model.
+
+
 ## Useful Resources
 - [ScriptRunConfig Class](https://docs.microsoft.com/en-us/python/api/azureml-core/azureml.core.scriptrunconfig?view=azure-ml-py)
 - [Configure and submit training runs](https://docs.microsoft.com/en-us/azure/machine-learning/how-to-set-up-training-targets)
@@ -13,26 +16,94 @@ This model is then compared to an Azure AutoML run.
 
 
 ## Summary
-**In 1-2 sentences, explain the problem statement: e.g "This dataset contains data about... we seek to predict..."**
+This dataset includes information about the customer, marketing campaign information, and social and economic metrics.<br>
+The task we have set ourselves here is to develop a model, that based on the information provided about each individual, will predict whether they will subscribe to a service.
 
-**In 1-2 sentences, explain the solution: e.g. "The best performing model was a ..."**
+The best performing model was a VotingEnsemble model of the Azure AutoML run with an accuracy of 91,6351%.
+This outperformed Hyperdrive's optimized logistic regression model with an accuracy of 91,6085%.
+
 
 ## Scikit-learn Pipeline
-**Explain the pipeline architecture, including data, hyperparameter tuning, and classification algorithm.**
+**Pipeline architecture, including data, hyperparameter tuning, and classification algorithm.**
 
-**What are the benefits of the parameter sampler you chose?**
+Create a compute target with VM size of '**Standard_DS3_v2**' with maximum 4 nodes.
 
-**What are the benefits of the early stopping policy you chose?**
+First we need to load and prepare the data. A logistic regression model is then built and trained using scikit-learn in train.py. The steps are as follows:
+- Import banking dataset using Azure TabularDatasetFactory
+- The data is then cleaned and transformed with a cleaning function
+- The processed data is then split 80% into a training set and 20% into a test set
+- Scikit-learn was used to train an initial logistic regression model as a classification algorithm while specifying the value of two hyperparameters, ***C*** and ***max_iter***. 
+	- ***C*** represents the inverse of the regularization strength.
+	- ***max_iter*** represents the maximum number of iterations required for the model to converge.<br>
+	These two parameters were originally passed in the Python script so that they can later be tweaked with Hyperdrive.
+- We define a HyperDrive configuration using the parameter sampler and an early stop policy. Then we submit the experiment.
+- The trained model is then saved in the directory "***./outputs/***".
+
+
+**Benefits of the parameter sampler**
+
+**Hyperparameters** are customizable parameters that you can use to control the model training process. Hyperparameter tuning is the process of finding the configuration of hyperparameters that results in the best performance.
+
+**RandomParameterSampling** is a parameter sampler that randomly selects hyperparameter values from a wide range specified by the user to train the model. This is much better than a raster sweep as it is not as computationally intensive and time consuming and can select parameters that achieve high accuracy. Random Sampler also supports early termination of low-performance runs, saving computational resources. The parameters passed to the random sample were:
+
+     C: 0.01, 0.1, 1.0, 10.0, 100.0
+
+     max_iter: 20, 50, 100, 120, 150
+
+The best model had parameters of ***C = 100.0*** and ***max_iter = 50*** and achieved an accuracy of ***91,6085%***.<br>
+*Best run metrics : {'Regularization Strength:': 100.0, 'Max iterations:': 50, 'Accuracy': 0.9160849772382398}*
+
+**Benefits of the early stopping policy**
+
+In this project, the **Bandit Policy** stop policy was chosen because it allows for greater savings.
+
+**BanditPolicy** is an early stop policy that will terminate runs early if they don't perform as well as the best model.
+This also helps improve computational efficiency and save time as poorly performing models are automatically terminated.
+Because our script will periodically report metrics as it runs, it makes sense to include an early stop policy.
+
+For this project, I used a Bandit early termination policy with parameters ***evaluation_interval=2*** and ***slack_factor=0.1***.
+
+***evaluation_interval***: This is optional and represents the frequency for applying the policy. Each time the training script logs the primary metric, it counts as an interval.<br>
+***slack_factor***: The amount of slack allowed in relation to the most powerful training run. This factor gives the slip as a ratio.
+
+Any run that does not fall within the Slack Factor or Slack Amount of the evaluation metric relative to the top performing run will be terminated. This means that with this policy, the best performing runs will be completed.
+
 
 ## AutoML
-**In 1-2 sentences, describe the model and hyperparameters generated by AutoML.**
+**Model and hyperparameters generated by AutoML.**
+
+**AutoML** generates about 30 different models and the best model with the highest accuracy is chosen. AutoML automatically chooses the hyperparameters for all the different algorithms used.
+
+In this project Azure AutoML tried different models such as: e.g.: RandomForests, BoostedTrees, XGBoost, LightGBM, SGDClassifier, VotingEnsemble etc.
+
+The best model was a ***VotingEnsemble***, which achieved an accuracy of 91,6351%.<br>
+Similar to the Random Forest, the voting ensemble estimates multiple base models and uses voting to combine the individual predictions to arrive at the final one.
 
 ## Pipeline comparison
-**Compare the two models and their performance. What are the differences in accuracy? In architecture? If there was a difference, why do you think there was one?**
+The two models performed very similarly in terms of accuracy.<br>
+There was not much difference in accuracy between AutoML and HyperDrive. For the HyperDrive model, we had an accuracy of 91,6085%, while for the AutoML model, the accuracy was 91,6351%.
+
+Architecturally, however, AutoML was superior. With AutoML we tried many different models that we couldn't have tried with HyperDrive in the same amount of time. We were able to test different models with just one configuration. If we wanted to do the same with HyperDrive, we would have to define a configuration for each model.
+
+AutoML is intuitive and uses multiple pre-processing steps with model variations, whereas in Hyperdrive we only optimize logistic regression with predefined processing. For more unbalanced and invisible data, AutoML would be better suited than hyperdrive.
+
+I think the main advantage of AutoML compared to Hyperdrive is AutoML's ability to easily test different algorithms.
+
 
 ## Future work
-**What are some areas of improvement for future experiments? Why might these improvements help the model?**
+For future experiments, data transformation techniques could be used in combination with logistic regression and hyperdrive to see if there is an improvement in performance.
+
+I would also try different Hyperdrive hyperparameter search algorithms like GridParameterSampling or BayesianParameterSampling for performance improvement.
+
+I would use different algorithms in combination with different hyperparameter configurations for hyperdrives.
+
+For AutoML, I want to try to implement explicit model complexity constraints to prevent overfitting. Also test different parameter values like number of folds for cross validation. I'd also like to try just working with raw data and passing that to AutoML to see how it handles it, if it affects the model chosen and the model accuracy.
+
+Reducing overfitting is an important task that improves model accuracy. If a model is overfitted, it may have high accuracy with training data but fail when inferring test data.
+
+Also, a much longer run of AutoML (increase the "***experiment_timeout_minutes***") would likely find even better models in this case. 
+
 
 ## Proof of cluster clean up
-**If you did not delete your compute cluster in the code, please complete this section. Otherwise, delete this section.**
-**Image of cluster marked for deletion**
+Cluster was deleted in the notebook.<br>
+The delete method ***compute_target.delete()*** can be found in the .ipynb code.
